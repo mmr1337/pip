@@ -1,4 +1,3 @@
-
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -8,6 +7,19 @@ local cashStat = player:WaitForChild("leaderstats"):WaitForChild("Cash")
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
+
+local LevelHandlerUtilitiesCache = nil
+local function GetLevelHandlerUtilities()
+    if LevelHandlerUtilitiesCache then return LevelHandlerUtilitiesCache end
+    local success, result = pcall(function()
+        return require(ReplicatedStorage:WaitForChild("TDX_Shared"):WaitForChild("Common"):WaitForChild("LevelHandlerUtilities"))
+    end)
+    if success and result then
+        LevelHandlerUtilitiesCache = result
+    end
+    return LevelHandlerUtilitiesCache
+end
+
 local function setThreadIdentity(identity)
     if setthreadidentity then
         setthreadidentity(identity)
@@ -16,21 +28,20 @@ local function setThreadIdentity(identity)
     end
 end
 
+
 local function SafeRemoteCall(remoteType, remote, ...)
     local args = {...}
-    return task.spawn(function()
-        setThreadIdentity(2)
-        if remoteType == "FireServer" then
-            pcall(function()
-                remote:FireServer(unpack(args))
-            end)
-        elseif remoteType == "InvokeServer" then
-            local success, result = pcall(function()
-                return remote:InvokeServer(unpack(args))
-            end)
-            return success and result or nil
-        end
-    end)
+    setThreadIdentity(2)
+    if remoteType == "FireServer" then
+        pcall(function()
+            remote:FireServer(unpack(args))
+        end)
+    elseif remoteType == "InvokeServer" then
+        local success, result = pcall(function()
+            return remote:InvokeServer(unpack(args))
+        end)
+        return success and result or nil
+    end
 end
 
 local function getGlobalEnv()
@@ -95,7 +106,7 @@ local function SafeRequire(path, timeout)
     while tick() - startTime < timeout do
         local success, result = pcall(function() return require(path) end)
         if success and result then return result end
-        RunService.RenderStepped:Wait()
+        task.wait(0.1)
     end
     return nil
 end
@@ -114,19 +125,16 @@ end
 
 local TowerClass = LoadTowerClass()
 if not TowerClass then 
-    error("Không thể load TowerClass - vui lòng đảm bảo bạn đang trong game TDX")
+    error("Cannot load TowerClass")
 end
 
 task.spawn(function()
     while task.wait(0.5) do
         for hash, tower in pairs(TowerClass.GetTowers()) do
             if tower.Converted == true then
-                if globalEnv.TDX_Config.UseThreadedRemotes then
-                    SafeRemoteCall("FireServer", Remotes.SellTower, hash)
-                else
-                    pcall(function() Remotes.SellTower:FireServer(hash) end)
-                end
-                task.wait(globalEnv.TDX_Config.MacroStepDelay)
+                setThreadIdentity(2)
+                pcall(function() Remotes.SellTower:FireServer(hash) end)
+                task.wait(0.05)
             end
         end
     end
@@ -144,6 +152,7 @@ local function GetTowerByAxis(targetX)
     return nil, nil
 end
 
+
 local function WaitForTowerInitialization(axisX, timeout)
     timeout = timeout or 5
     local startTime = tick()
@@ -152,7 +161,7 @@ local function WaitForTowerInitialization(axisX, timeout)
         if hash and tower and tower.LevelHandler then
             return hash, tower
         end
-        RunService.RenderStepped:Wait()
+        task.wait(0.05)
     end
     return nil, nil
 end
@@ -164,13 +173,16 @@ local function getGameUI()
         if interface and interface.Parent then
             local gameInfoBar = interface:FindFirstChild("GameInfoBar")
             if gameInfoBar and gameInfoBar.Parent then
-                local waveFrame = gameInfoBar:FindFirstChild("Wave")
-                local timeFrame = gameInfoBar:FindFirstChild("TimeLeft")
-                if waveFrame and timeFrame and waveFrame.Parent and timeFrame.Parent then
-                    local waveText = waveFrame:FindFirstChild("WaveText")
-                    local timeText = timeFrame:FindFirstChild("TimeLeftText")
-                    if waveText and timeText and waveText.Parent and timeText.Parent then
-                        return { waveText = waveText, timeText = timeText }
+                local default = gameInfoBar:FindFirstChild("Default")
+                if default and default.Parent then
+                    local waveFrame = default:FindFirstChild("Wave")
+                    local timeFrame = default:FindFirstChild("TimeLeft")
+                    if waveFrame and timeFrame and waveFrame.Parent and timeFrame.Parent then
+                        local waveText = waveFrame:FindFirstChild("WaveText")
+                        local timeText = timeFrame:FindFirstChild("TimeLeftText")
+                        if waveText and timeText and waveText.Parent and timeText.Parent then
+                            return { waveText = waveText, timeText = timeText }
+                        end
                     end
                 end
             end
@@ -178,7 +190,7 @@ local function getGameUI()
         attempts = attempts + 1
         task.wait(1)
     end
-    error("Không thể tìm thấy Game UI")
+    error("Cannot find Game UI")
 end
 
 local function convertToTimeFormat(number)
@@ -208,16 +220,14 @@ local function SellAllTowers(skipList)
     if skipList then for _, name in ipairs(skipList) do skipMap[name] = true end end
     for hash, tower in pairs(TowerClass.GetTowers()) do
         if not skipMap[tower.Type] then
-            if globalEnv.TDX_Config.UseThreadedRemotes then
-                SafeRemoteCall("FireServer", Remotes.SellTower, hash)
-            else
-                pcall(function() Remotes.SellTower:FireServer(hash) end)
-            end
+            setThreadIdentity(2)
+            pcall(function() Remotes.SellTower:FireServer(hash) end)
             task.wait(globalEnv.TDX_Config.MacroStepDelay)
         end
     end
 end
 
+-- [FIX] Используем кэшированный модуль вместо require каждый раз
 local function GetCurrentUpgradeCost(tower, path)
     if not tower or not tower.LevelHandler then return nil end
     
@@ -243,27 +253,29 @@ local function GetCurrentUpgradeCost(tower, path)
         dynamicPriceData = playerData or {}
     end
     
+    local LHU = GetLevelHandlerUtilities()
+    if not LHU then return nil end
+    
     local success, cost = pcall(function()
-        local LevelHandlerUtilities = require(ReplicatedStorage:WaitForChild("TDX_Shared"):WaitForChild("Common"):WaitForChild("LevelHandlerUtilities"))
-        return LevelHandlerUtilities.GetLevelUpgradeCost(levelHandler, towerName, path, 1, discount, priceMultiplier, dynamicPriceData)
+        return LHU.GetLevelUpgradeCost(levelHandler, towerName, path, 1, discount, priceMultiplier, dynamicPriceData)
     end)
     
-    if not success then
-        return nil
-    end
-    
+    if not success then return nil end
     return cost
 end
 
+
 local function WaitForCash(amount)
-    while cashStat.Value < amount do RunService.RenderStepped:Wait() end
+    while cashStat.Value < amount do task.wait(0.1) end
 end
+
 
 local function PlaceTowerRetry(args, axisValue)
     for i = 1, getMaxAttempts() do
         if globalEnv.TDX_Config.UseThreadedRemotes then
             SafeRemoteCall("InvokeServer", Remotes.PlaceTower, unpack(args))
         else
+            setThreadIdentity(2)
             pcall(function() Remotes.PlaceTower:InvokeServer(unpack(args)) end)
         end
         task.wait(globalEnv.TDX_Config.MacroStepDelay)
@@ -272,6 +284,7 @@ local function PlaceTowerRetry(args, axisValue)
     end
     return false
 end
+
 
 local function UpgradeTowerRetry(axisValue, path)
     for i = 1, getMaxAttempts() do
@@ -285,16 +298,17 @@ local function UpgradeTowerRetry(axisValue, path)
         if globalEnv.TDX_Config.UseThreadedRemotes then
             SafeRemoteCall("FireServer", Remotes.TowerUpgradeRequest, hash, path, 1)
         else
+            setThreadIdentity(2)
             pcall(function() Remotes.TowerUpgradeRequest:FireServer(hash, path, 1) end)
         end
 
         task.wait(globalEnv.TDX_Config.MacroStepDelay)
         local startTime = tick()
         repeat
-            RunService.RenderStepped:Wait()
+            task.wait(0.05)
             local _, t = GetTowerByAxis(axisValue)
             if t and t.LevelHandler and t.LevelHandler:GetLevelOnPath(path) > before then return true end
-        until tick() - startTime > 3
+        until tick() - startTime > 2
     end
     return false
 end
@@ -306,6 +320,7 @@ local function ChangeTargetRetry(axisValue, targetType)
             if globalEnv.TDX_Config.UseThreadedRemotes then
                 SafeRemoteCall("FireServer", Remotes.ChangeQueryType, hash, targetType)
             else
+                setThreadIdentity(2)
                 pcall(function() Remotes.ChangeQueryType:FireServer(hash, targetType) end)
             end
             task.wait(globalEnv.TDX_Config.MacroStepDelay)
@@ -320,6 +335,7 @@ local function SkipWaveRetry()
     if globalEnv.TDX_Config.UseThreadedRemotes then
         SafeRemoteCall("FireServer", Remotes.SkipWaveVoteCast, true)
     else
+        setThreadIdentity(2)
         pcall(function() Remotes.SkipWaveVoteCast:FireServer(true) end)
     end
     task.wait(globalEnv.TDX_Config.MacroStepDelay)
@@ -340,41 +356,27 @@ local function UseMovingSkillRetry(axisValue, skillIndex, location)
                 if cooldown > 0 then task.wait(cooldown + 0.1) end
 
                 local success = false
-                if globalEnv.TDX_Config.UseThreadedRemotes then
-                    if location == "no_pos" then
+                setThreadIdentity(2)
+
+                if location == "no_pos" then
+                    success = pcall(function()
                         if useFireServer then
-                            SafeRemoteCall("FireServer", TowerUseAbilityRequest, hash, skillIndex)
+                            TowerUseAbilityRequest:FireServer(hash, skillIndex)
                         else
-                            SafeRemoteCall("InvokeServer", TowerUseAbilityRequest, hash, skillIndex)
+                            TowerUseAbilityRequest:InvokeServer(hash, skillIndex)
                         end
-                        success = true
-                    else
-                        local x, y, z = location:match("([^,%s]+),%s*([^,%s]+),%s*([^,%s]+)")
-                        if x and y and z then
-                            local pos = Vector3.new(tonumber(x), tonumber(y), tonumber(z))
-                            if useFireServer then
-                                SafeRemoteCall("FireServer", TowerUseAbilityRequest, hash, skillIndex, pos)
-                            else
-                                SafeRemoteCall("InvokeServer", TowerUseAbilityRequest, hash, skillIndex, pos)
-                            end
-                            success = true
-                        end
-                    end
+                    end)
                 else
-                    if location == "no_pos" then
+                    local x, y, z = location:match("([^,%s]+),%s*([^,%s]+),%s*([^,%s]+)")
+                    if x and y and z then
+                        local pos = Vector3.new(tonumber(x), tonumber(y), tonumber(z))
                         success = pcall(function()
-                            if useFireServer then TowerUseAbilityRequest:FireServer(hash, skillIndex) 
-                            else TowerUseAbilityRequest:InvokeServer(hash, skillIndex) end
+                            if useFireServer then
+                                TowerUseAbilityRequest:FireServer(hash, skillIndex, pos)
+                            else
+                                TowerUseAbilityRequest:InvokeServer(hash, skillIndex, pos)
+                            end
                         end)
-                    else
-                        local x, y, z = location:match("([^,%s]+),%s*([^,%s]+),%s*([^,%s]+)")
-                        if x and y and z then
-                            local pos = Vector3.new(tonumber(x), tonumber(y), tonumber(z))
-                            success = pcall(function()
-                                if useFireServer then TowerUseAbilityRequest:FireServer(hash, skillIndex, pos) 
-                                else TowerUseAbilityRequest:InvokeServer(hash, skillIndex, pos) end
-                            end)
-                        end
                     end
                 end
 
@@ -396,6 +398,7 @@ local function SellTowerRetry(axisValue)
             if globalEnv.TDX_Config.UseThreadedRemotes then
                 SafeRemoteCall("FireServer", Remotes.SellTower, hash)
             else
+                setThreadIdentity(2)
                 pcall(function() Remotes.SellTower:FireServer(hash) end)
             end
             task.wait(globalEnv.TDX_Config.MacroStepDelay)
@@ -543,7 +546,8 @@ local function StartRebuildSystem(rebuildEntry, towerRecords, skipTypesMap)
 
                     activeJobs[job.x] = nil
                 else
-                    RunService.RenderStepped:Wait()
+
+                    task.wait(0.1)
                 end
             end
         end)
@@ -605,7 +609,7 @@ local function StartRebuildSystem(rebuildEntry, towerRecords, skipTypesMap)
                 end)
             end
 
-            task.wait(config.RebuildCheckInterval or 0)
+            task.wait(config.RebuildCheckInterval or 0.1)
         end
     end)
 end
@@ -616,18 +620,21 @@ local function RunMacroRunner()
     local macroPath = "tdx/macros/" .. macroName .. ".json"
 
     if not safeIsFile(macroPath) then 
-        error("Không tìm thấy file macro: " .. macroPath) 
+        error("Macro file not found: " .. macroPath) 
     end
 
     local macroContent = safeReadFile(macroPath)
     if not macroContent then 
-        error("Không thể đọc file macro") 
+        error("Cannot read macro file") 
     end
 
     local ok, macro = pcall(function() return HttpService:JSONDecode(macroContent) end)
     if not ok or type(macro) ~= "table" then 
-        error("Lỗi parse macro file") 
+        error("Macro parse error") 
     end
+
+
+    GetLevelHandlerUtilities()
 
     local gameUI, towerRecords, skipTypesMap, monitorEntries, rebuildSystemActive = getGameUI(), {}, {}, {}, false
 
