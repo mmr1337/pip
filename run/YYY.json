@@ -1,5 +1,4 @@
 [
-    {"SuperFunction": "rebuild", "Be": true},
 {"TowerPlaceCost":1000,"TowerPlaced":"Golden Mobster","TowerVector":"-9.809416770935059, -0.2765321731567383, -20.43377685546875","Rotation":"0","TowerA1":"510.42928952600005"},
 {"TowerUpgraded":-9.809416770935059,"UpgradeCost":0,"UpgradePath":2},
 {"TowerUpgraded":-9.809416770935059,"UpgradeCost":0,"UpgradePath":2},
@@ -1660,6 +1659,7 @@
 {"TowerUpgraded":-15.864147186279297,"UpgradeCost":0,"UpgradePath":1},
 {"TowerUpgraded":-15.864147186279297,"UpgradeCost":0,"UpgradePath":1},
 {"SellTower":-10.061720848083496},
+    {"SuperFunction": "rebuild",
 {"TowerPlaceCost":7250,"TowerPlaced":"Golden Juggernaut","TowerVector":"-10.787184715270996, -0.2765340805053711, -17.692962646484375","Rotation":"1","TowerA1":"4313.800147209"},
 {"TowerUpgraded":-10.787184715270996,"UpgradeCost":0,"UpgradePath":2},
 {"TowerUpgraded":-10.787184715270996,"UpgradeCost":0,"UpgradePath":2},
