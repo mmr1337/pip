@@ -57,7 +57,7 @@ repeat wait() until game:IsLoaded() and game.Players.LocalPlayer
 
 getgenv().TDX_Config = {
     ["Key"] = "your_access_key_here", -- Chỉ 1 key duy nhất
-    ["mapvoting"] = "Christmas25Part1Nightmare",
+    ["mapvoting"] = "Christmas25Part1",
     ["Return Lobby"] = true,
     ["x1.5 Speed"] = true,
     ["loadout"] = 0,
