@@ -1,4 +1,5 @@
 [
+  {"SuperFunction": "rebuild"},
   {"TowerPlaceCost":700,"TowerPlaced":"Cryo Mortar","TowerVector":"6.14305305480957, 5.287152290344238, -45.46843338012695","Rotation":"0","TowerA1":"821.3366443"},
   {"TowerUpgraded":6.14305305480957,"UpgradeCost":0,"UpgradePath":1},
   {"TargetTime":31,"TargetType":4,"TowerTargetChange":6.14305305480957,"TargetWave":"WAVE 0"},
@@ -248,4 +249,5 @@
   {"towermoving":-80.16259765625,"wave":"WAVE 50","location":"-29.208341598510742, -0.18000000715255737, -35.932342529296875","skillindex":1},
   {"towermoving":-77.45899963378906,"wave":"WAVE 50","location":"-39.70185089111328, -0.18000000715255737, -23.8394832611084","skillindex":1},
   {"towermoving":-85.22450256347656,"wave":"WAVE 50","location":"-39.3306999206543, -0.18000000715255737, -23.8394832611084","skillindex":1}
+
 ]
