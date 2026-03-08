@@ -75,7 +75,7 @@ loadstring(game:HttpGet(loaderURL))()
 _G.WaveConfig = {
     ["WAVE 0"] = "i",
     ["WAVE 1"] = "i",
-    ["WAVE 2"] = "i",
+    ["WAVE 2"] = "i"
 }
 
 -- Run auto skip script
